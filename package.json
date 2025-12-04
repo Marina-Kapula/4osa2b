@@ -4,10 +4,10 @@
   "description": "",
   "main": "index.js",
 "scripts": {
-  "start": "cross-env NODE_ENV=production node index.js",
-  "dev":   "cross-env NODE_ENV=development node --watch index.js",
-  "test":  "cross-env NODE_ENV=test node --test",
-  "lint":  "eslint ."
+  "start": "node index.js",
+  "dev": "node --watch index.js",
+  "test": "node --test",
+  "lint": "eslint ."
 }
 ,
   "keywords": [],
@@ -15,6 +15,7 @@
   "license": "ISC",
   "dependencies": {
     "cors": "^2.8.5",
+    "dotenv": "^17.2.3",
     "express": "^5.2.1",
     "mongoose": "^9.0.0"
   },

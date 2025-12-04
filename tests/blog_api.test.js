@@ -3,7 +3,8 @@ const assert = require('node:assert')
 const mongoose = require('mongoose')
 const supertest = require('supertest')
 const app = require('../app')
-const Blog = require('../models/blog')
+const Blog = require('../utils/models/blog')
+
 
 const api = supertest(app)
 

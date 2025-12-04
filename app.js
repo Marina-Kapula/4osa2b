@@ -3,7 +3,9 @@ const mongoose = require('mongoose')
 const cors = require('cors')
 const config = require('./utils/config')
 const logger = require('./utils/logger')
-const Blog = require('./models/blog')
+const Blog = require('./utils/models/blog')
+
+
 
 const app = express()
 
