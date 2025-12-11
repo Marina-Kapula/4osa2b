@@ -4,10 +4,22 @@ const cors = require('cors')
 const config = require('./utils/config')
 const logger = require('./utils/logger')
 const Blog = require('./utils/models/blog')
-const usersRouter = require('./controllers/users')
 const User = require('./utils/models/user')
+const usersRouter = require('./controllers/users')
+const loginRouter = require('./controllers/login')
+
+const jwt = require('jsonwebtoken')
 
 const app = express()
+
+// 4.19: helper to get token from Authorization header
+const getTokenFrom = (request) => {
+  const authorization = request.get('authorization')
+  if (authorization && authorization.startsWith('Bearer ')) {
+    return authorization.replace('Bearer ', '')
+  }
+  return null
+}
 
 mongoose.set('strictQuery', false)
 
@@ -24,6 +36,7 @@ mongoose
 app.use(cors())
 app.use(express.json())
 app.use('/api/users', usersRouter)
+app.use('/api/login', loginRouter)
 
 // 4.8 + 4.17: GET /api/blogs c populate
 app.get('/api/blogs', async (request, response) => {
@@ -34,7 +47,7 @@ app.get('/api/blogs', async (request, response) => {
   response.json(blogs)
 })
 
-// 4.10–4.12 + 4.17: POST /api/blogs
+// 4.10–4.12 + 4.17 + 4.19: POST /api/blogs
 app.post('/api/blogs', async (request, response) => {
   const body = request.body
 
@@ -43,19 +56,29 @@ app.post('/api/blogs', async (request, response) => {
     return response.status(400).end()
   }
 
-  // 4.17: берём какого‑нибудь пользователя (первого в базе)
-  const users = await User.find({})
-  const user = users[0]
+  // 4.19: проверяем токен
+  const token = getTokenFrom(request)
+  const decodedToken = jwt.verify(token, process.env.SECRET)
+  if (!decodedToken.id) {
+    return response.status(401).json({ error: 'token invalid' })
+  }
+
+  const user = await User.findById(decodedToken.id)
 
   const blog = new Blog({
     title: body.title,
     author: body.author,
     url: body.url,
-    likes: body.likes || 0,  // 4.11
-    user: user._id,          // 4.17
+    likes: body.likes || 0,   // 4.11
+    user: user._id,           // 4.17 + 4.19
   })
 
   const savedBlog = await blog.save()
+
+  // 4.17: добавляем блог в user.blogs
+  user.blogs = user.blogs.concat(savedBlog._id)
+  await user.save()
+
   response.status(201).json(savedBlog)
 })
 
