@@ -1,10 +1,15 @@
 const mongoose = require('mongoose')
 
+// 4.17: схема блога с user
 const blogSchema = new mongoose.Schema({
   title: String,
   author: String,
   url: String,
   likes: Number,
+  user: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+  },
 })
 
 // 4.9: преобразовать _id -> id, убрать __v

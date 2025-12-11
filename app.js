@@ -5,9 +5,7 @@ const config = require('./utils/config')
 const logger = require('./utils/logger')
 const Blog = require('./utils/models/blog')
 const usersRouter = require('./controllers/users')
-
-
-
+const User = require('./utils/models/user')
 
 const app = express()
 
@@ -27,14 +25,16 @@ app.use(cors())
 app.use(express.json())
 app.use('/api/users', usersRouter)
 
-
-// 4.8 + async/await: GET /api/blogs
+// 4.8 + 4.17: GET /api/blogs c populate
 app.get('/api/blogs', async (request, response) => {
-  const blogs = await Blog.find({})
+  const blogs = await Blog
+    .find({})
+    .populate('user', { username: 1, name: 1 })
+
   response.json(blogs)
 })
 
-// 4.10–4.12: POST /api/blogs
+// 4.10–4.12 + 4.17: POST /api/blogs
 app.post('/api/blogs', async (request, response) => {
   const body = request.body
 
@@ -43,12 +43,16 @@ app.post('/api/blogs', async (request, response) => {
     return response.status(400).end()
   }
 
+  // 4.17: берём какого‑нибудь пользователя (первого в базе)
+  const users = await User.find({})
+  const user = users[0]
+
   const blog = new Blog({
     title: body.title,
     author: body.author,
     url: body.url,
-    // 4.11: likes по умолчанию 0
-    likes: body.likes || 0,
+    likes: body.likes || 0,  // 4.11
+    user: user._id,          // 4.17
   })
 
   const savedBlog = await blog.save()
@@ -75,6 +79,5 @@ app.put('/api/blogs/:id', async (request, response) => {
 
   response.json(updatedBlog)
 })
-
 
 module.exports = app
