@@ -4,6 +4,8 @@ const cors = require('cors')
 const config = require('./utils/config')
 const logger = require('./utils/logger')
 const Blog = require('./utils/models/blog')
+const usersRouter = require('./controllers/users')
+
 
 
 
@@ -23,6 +25,8 @@ mongoose
 
 app.use(cors())
 app.use(express.json())
+app.use('/api/users', usersRouter)
+
 
 // 4.8 + async/await: GET /api/blogs
 app.get('/api/blogs', async (request, response) => {
