@@ -51,4 +51,26 @@ app.post('/api/blogs', async (request, response) => {
   response.status(201).json(savedBlog)
 })
 
+// 4.13: DELETE /api/blogs/:id
+app.delete('/api/blogs/:id', async (request, response) => {
+  const id = request.params.id
+  await Blog.findByIdAndDelete(id)
+  response.status(204).end()
+})
+
+// 4.14: PUT /api/blogs/:id
+app.put('/api/blogs/:id', async (request, response) => {
+  const id = request.params.id
+  const body = request.body
+
+  const updatedBlog = await Blog.findByIdAndUpdate(
+    id,
+    { likes: body.likes },
+    { new: true, runValidators: true }
+  )
+
+  response.json(updatedBlog)
+})
+
+
 module.exports = app

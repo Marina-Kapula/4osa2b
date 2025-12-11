@@ -87,7 +87,25 @@ test('if likes property is missing, it will default to 0', async () => {
   assert.strictEqual(response.body.likes, 0)
 })
 
+
 // 4.12: нет title или url -> 400 Bad Request
+test('a blog can be deleted', async () => {
+  const blogsAtStart = await Blog.find({})
+  const blogToDelete = blogsAtStart[0]
+
+  await api
+    .delete(`/api/blogs/${blogToDelete.id}`)
+    .expect(204)
+
+  const blogsAtEnd = await Blog.find({})
+
+  const titles = blogsAtEnd.map(b => b.title)
+  assert(!titles.includes(blogToDelete.title))
+
+  assert.strictEqual(blogsAtEnd.length, blogsAtStart.length - 1)
+})
+
+// 4.13: a blog can be deleted
 test('blog without title is not added', async () => {
   const newBlog = {
     author: 'No title Author',
@@ -100,6 +118,26 @@ test('blog without title is not added', async () => {
   const blogsAtEnd = await Blog.find({})
   assert.strictEqual(blogsAtEnd.length, initialBlogs.length)
 })
+
+// 4.14: a blog's likes can be updated
+test("a blog's likes can be updated", async () => {
+  const blogsAtStart = await Blog.find({})
+  const blogToUpdate = blogsAtStart[0]
+
+  const updatedData = { likes: blogToUpdate.likes + 1 }
+
+  const response = await api
+    .put(`/api/blogs/${blogToUpdate.id}`)
+    .send(updatedData)
+    .expect(200)
+    .expect('Content-Type', /application\/json/)
+
+  assert.strictEqual(response.body.likes, blogToUpdate.likes + 1)
+
+  const blogInDb = await Blog.findById(blogToUpdate.id)
+  assert.strictEqual(blogInDb.likes, blogToUpdate.likes + 1)
+})
+
 
 test('blog without url is not added', async () => {
   const newBlog = {
