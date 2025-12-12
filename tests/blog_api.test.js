@@ -1,12 +1,24 @@
+// tests/blog_api.test.js
+
 const { test, beforeEach, after } = require('node:test')
 const assert = require('node:assert')
 const mongoose = require('mongoose')
 const supertest = require('supertest')
 const app = require('../app')
 const Blog = require('../utils/models/blog')
-
+const User = require('../utils/models/user')
+const bcrypt = require('bcryptjs')
 
 const api = supertest(app)
+
+// helper функція для отримання токена
+const getToken = async () => {
+  const response = await api
+    .post('/api/login')
+    .send({ username: 'testuser', password: 'testpassword' })
+  
+  return response.body.token
+}
 
 const initialBlogs = [
   {
@@ -26,7 +38,24 @@ const initialBlogs = [
 // перед КАЖДЫМ тестом очищаем и заполняем тестовую БД
 beforeEach(async () => {
   await Blog.deleteMany({})
-  await Blog.insertMany(initialBlogs)
+  await User.deleteMany({})
+
+  // створюємо тестового користувача
+  const passwordHash = await bcrypt.hash('testpassword', 10)
+  const user = new User({
+    username: 'testuser',
+    name: 'Test User',
+    passwordHash,
+  })
+  const savedUser = await user.save()
+
+  // створюємо блоги для цього користувача
+  const blogsWithUser = initialBlogs.map(blog => ({
+    ...blog,
+    user: savedUser._id
+  }))
+  
+  await Blog.insertMany(blogsWithUser)
 })
 
 // 4.8: GET /api/blogs возвращает правильное количество и JSON
@@ -48,8 +77,10 @@ test('unique identifier field is named id', async () => {
   assert.strictEqual(blog._id, undefined)
 })
 
-// 4.10: POST /api/blogs добавляет новый блог
+// 4.10 + 4.23: POST /api/blogs добавляет новый блог (с токеном)
 test('a valid blog can be added', async () => {
+  const token = await getToken()
+
   const newBlog = {
     title: 'New blog',
     author: 'Author Three',
@@ -59,6 +90,7 @@ test('a valid blog can be added', async () => {
 
   await api
     .post('/api/blogs')
+    .set('Authorization', `Bearer ${token}`)
     .send(newBlog)
     .expect(201)
     .expect('Content-Type', /application\/json/)
@@ -70,8 +102,10 @@ test('a valid blog can be added', async () => {
   assert(titles.includes('New blog'))
 })
 
-// 4.11: если likes не указан, он становится 0
+// 4.11 + 4.23: если likes не указан, он становится 0
 test('if likes property is missing, it will default to 0', async () => {
+  const token = await getToken()
+
   const newBlog = {
     title: 'No likes field blog',
     author: 'Author Four',
@@ -80,6 +114,7 @@ test('if likes property is missing, it will default to 0', async () => {
 
   const response = await api
     .post('/api/blogs')
+    .set('Authorization', `Bearer ${token}`)
     .send(newBlog)
     .expect(201)
     .expect('Content-Type', /application\/json/)
@@ -87,14 +122,16 @@ test('if likes property is missing, it will default to 0', async () => {
   assert.strictEqual(response.body.likes, 0)
 })
 
-
-// 4.12: нет title или url -> 400 Bad Request
+// 4.13 + 4.23: a blog can be deleted (з токеном)
 test('a blog can be deleted', async () => {
+  const token = await getToken()
+
   const blogsAtStart = await Blog.find({})
   const blogToDelete = blogsAtStart[0]
 
   await api
     .delete(`/api/blogs/${blogToDelete.id}`)
+    .set('Authorization', `Bearer ${token}`)
     .expect(204)
 
   const blogsAtEnd = await Blog.find({})
@@ -105,21 +142,27 @@ test('a blog can be deleted', async () => {
   assert.strictEqual(blogsAtEnd.length, blogsAtStart.length - 1)
 })
 
-// 4.13: a blog can be deleted
+// 4.12 + 4.23: нет title -> 400 Bad Request (навіть з токеном)
 test('blog without title is not added', async () => {
+  const token = await getToken()
+
   const newBlog = {
     author: 'No title Author',
     url: 'http://example.com/5',
     likes: 1,
   }
 
-  await api.post('/api/blogs').send(newBlog).expect(400)
+  await api
+    .post('/api/blogs')
+    .set('Authorization', `Bearer ${token}`)
+    .send(newBlog)
+    .expect(400)
 
   const blogsAtEnd = await Blog.find({})
   assert.strictEqual(blogsAtEnd.length, initialBlogs.length)
 })
 
-// 4.14: a blog's likes can be updated
+// 4.14: a blog's likes can be updated (БЕЗ токена)
 test("a blog's likes can be updated", async () => {
   const blogsAtStart = await Blog.find({})
   const blogToUpdate = blogsAtStart[0]
@@ -138,18 +181,55 @@ test("a blog's likes can be updated", async () => {
   assert.strictEqual(blogInDb.likes, blogToUpdate.likes + 1)
 })
 
-
+// 4.12 + 4.23: нет url -> 400 Bad Request (навіть з токеном)
 test('blog without url is not added', async () => {
+  const token = await getToken()
+
   const newBlog = {
     title: 'No url blog',
     author: 'No url Author',
     likes: 1,
   }
 
-  await api.post('/api/blogs').send(newBlog).expect(400)
+  await api
+    .post('/api/blogs')
+    .set('Authorization', `Bearer ${token}`)
+    .send(newBlog)
+    .expect(400)
 
   const blogsAtEnd = await Blog.find({})
   assert.strictEqual(blogsAtEnd.length, initialBlogs.length)
+})
+
+// 4.23: НОВИЙ ТЕСТ - без токена повертає 401
+test('adding a blog fails with status code 401 if token is not provided', async () => {
+  const newBlog = {
+    title: 'Blog without token',
+    author: 'No Token Author',
+    url: 'http://example.com/notoken',
+    likes: 0,
+  }
+
+  await api
+    .post('/api/blogs')
+    .send(newBlog)
+    .expect(401)
+
+  const blogsAtEnd = await Blog.find({})
+  assert.strictEqual(blogsAtEnd.length, initialBlogs.length)
+})
+
+// 4.23: НОВИЙ ТЕСТ - видалення без токена повертає 401
+test('deleting a blog fails with status code 401 if token is not provided', async () => {
+  const blogsAtStart = await Blog.find({})
+  const blogToDelete = blogsAtStart[0]
+
+  await api
+    .delete(`/api/blogs/${blogToDelete.id}`)
+    .expect(401)
+
+  const blogsAtEnd = await Blog.find({})
+  assert.strictEqual(blogsAtEnd.length, blogsAtStart.length)
 })
 
 after(async () => {
