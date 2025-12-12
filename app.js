@@ -1,11 +1,9 @@
-// app.js
-
 const express = require('express')
 const mongoose = require('mongoose')
 const cors = require('cors')
 const config = require('./utils/config')
 const logger = require('./utils/logger')
-const middleware = require('./utils/middleware') // 4.20: підключаємо middleware
+const middleware = require('./utils/middleware') 
 const Blog = require('./utils/models/blog')
 const User = require('./utils/models/user')
 const usersRouter = require('./controllers/users')
