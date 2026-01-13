@@ -1,13 +1,12 @@
-// utils/middleware.js - повна версія
-
-const logger = require('./logger')
 const jwt = require('jsonwebtoken')
 const User = require('./models/user')
 
+
+
 const tokenExtractor = (request, response, next) => {
   const authorization = request.get('authorization')
-  if (authorization && authorization.startsWith('Bearer ')) {
-    request.token = authorization.replace('Bearer ', '')
+  if (authorization && authorization.toLowerCase().startsWith('bearer ')) {
+    request.token = authorization.substring(7)
   } else {
     request.token = null
   }
@@ -15,25 +14,32 @@ const tokenExtractor = (request, response, next) => {
 }
 
 const userExtractor = async (request, response, next) => {
-  if (!request.token) {
-    return response.status(401).json({ error: 'token missing' })
+  const token = request.token
+
+  if (!token) {
+    request.user = null
+    return next()
   }
 
+  let decodedToken
   try {
-    const decodedToken = jwt.verify(request.token, process.env.SECRET)
-    
-    if (!decodedToken.id) {
-      return response.status(401).json({ error: 'token invalid' })
-    }
-
-    request.user = await User.findById(decodedToken.id)
-    next()
+    decodedToken = jwt.verify(token, process.env.SECRET)
   } catch (error) {
-    return response.status(401).json({ error: 'token invalid' })
+    request.user = null
+    return next()
   }
+
+  if (!decodedToken.id) {
+    request.user = null
+    return next()
+  }
+
+  const user = await User.findById(decodedToken.id)
+  request.user = user || null
+  next()
 }
 
 module.exports = {
   tokenExtractor,
-  userExtractor
+  userExtractor,
 }

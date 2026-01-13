@@ -1,6 +1,5 @@
 const mongoose = require('mongoose')
 
-// 4.17: схема блога с user
 const blogSchema = new mongoose.Schema({
   title: String,
   author: String,
@@ -12,7 +11,6 @@ const blogSchema = new mongoose.Schema({
   },
 })
 
-// 4.9: преобразовать _id -> id, убрать __v
 blogSchema.set('toJSON', {
   transform: (document, returnedObject) => {
     returnedObject.id = returnedObject._id.toString()
